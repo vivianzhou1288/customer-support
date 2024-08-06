@@ -13,11 +13,60 @@ export default function Home() {
   const [messages, setMessages] = useState([
     {
       role: "assistant",
-      content:
-        "Hi! I'm the Headstarter support assistant. How can I help you today?",
+      content: "Hi, I'm your travel assistant! How can I help you today?",
     },
   ]);
   const [message, setMessage] = useState("");
+
+  const sendMessage = async () => {
+    const userMessage = message.trim();
+    if (!userMessage) return; // Prevent sending empty messages
+
+    setMessage("");  // Clear the input field
+    setMessages((messages) => [
+      ...messages,
+      { role: "user", content: userMessage },  // Add the user's message to the chat
+      { role: "assistant", content: "Typing..." },  // Add a placeholder for the assistant's response
+    ]);
+
+    try {
+      // Send the message to the server
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ message: userMessage }),  // Send only the user's message
+      });
+
+      const data = await response.json();
+      console.log('Response from API:', data);
+
+      setMessages((messages) => {
+        let lastMessage = messages[messages.length - 1];  // Get the last message (assistant's placeholder)
+        let otherMessages = messages.slice(0, messages.length - 1);  // Get all other messages
+        return [
+          ...otherMessages,
+          { ...lastMessage, content: formatMessage(data.response) },  // Format and set the assistant's message
+        ];
+      });
+    } catch (error) {
+      console.error("Error sending message:", error);
+      setMessages((messages) => [
+        ...messages.slice(0, messages.length - 1),  // Remove the placeholder
+        { role: "assistant", content: "Error communicating with the server." },
+      ]);
+    }
+  };
+
+  const formatMessage = (message) => {
+    // Remove unwanted characters and format the message
+    return message
+      .replace(/\\n/g, "\n")  // Replace newline characters
+      .replace(/{"response":"|"}$/g, "")  // Remove JSON artifacts
+      .trim();
+  };
+
   return (
     <Box
       sx={{
@@ -88,8 +137,15 @@ export default function Home() {
             fullWidth
             value={message}
             onChange={(e) => setMessage(e.target.value)}
+            onKeyPress={(e) => {
+              if (e.key === 'Enter') {
+                sendMessage();
+              }
+            }}
           />
-          <Button variant="contained">Send</Button>
+          <Button variant="contained" onClick={sendMessage}>
+            Send
+          </Button>
         </Stack>
       </Box>
     </Box>
